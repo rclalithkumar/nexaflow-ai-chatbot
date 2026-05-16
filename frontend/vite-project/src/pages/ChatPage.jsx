@@ -40,7 +40,7 @@ export default function ChatPage() {
   const fetchHistory = async () => {
     try {
       const response = await axios.get(
-        "http://localhost:5000/api/history"
+        "https://nexaflow-ai-chatbot.onrender.com/api/history"
       );
 
       const formattedMessages = [];
@@ -96,7 +96,7 @@ export default function ChatPage() {
 
     try {
       const response = await axios.post(
-        "http://localhost:5000/api/chat",
+        "https://nexaflow-ai-chatbot.onrender.com/api/chat",
         {
           message: currentMessage,
         }

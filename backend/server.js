@@ -29,31 +29,35 @@ app.get("/", (req, res) => {
 function detectIntent(message) {
   const text = message.toLowerCase();
 
+  // ORDER
   if (
-    text.includes("order") ||
-    text.includes("track") ||
-    text.includes("delivery") ||
-    text.includes("where is my")
+    text.includes("track order") ||
+    text.includes("order id") ||
+    text.includes("track shipment") ||
+    text.includes("delivery issue") ||
+    text.includes("where is my order")
   ) {
     return "order";
   }
 
+  // BILLING
   if (
-    text.includes("price") ||
-    text.includes("billing") ||
     text.includes("invoice") ||
     text.includes("payment") ||
+    text.includes("refund") ||
+    text.includes("billing") ||
     text.includes("subscription")
   ) {
     return "billing";
   }
 
+  // TECHNICAL
   if (
     text.includes("error") ||
     text.includes("bug") ||
+    text.includes("api") ||
     text.includes("not working") ||
-    text.includes("issue") ||
-    text.includes("api")
+    text.includes("technical issue")
   ) {
     return "technical";
   }
@@ -73,26 +77,25 @@ async function detectIntentAI(message) {
           {
             role: "system",
             content: `
-You are an intent classification system.
+You are an enterprise intent classifier.
 
-Classify the message into ONLY JSON.
-
-Possible intents:
+Classify ONLY into:
 - order
 - billing
 - technical
 - general
 
 Rules:
-- order id, tracking, shipment -> order
-- invoice, payment, refund -> billing
-- error, bug, api issue -> technical
-- everything else -> general
+- order tracking, shipment, delivery = order
+- invoice, payment, refund = billing
+- error, api, bug = technical
+- normal greetings/questions = general
 
-Return ONLY valid JSON:
+Return ONLY valid JSON.
 
+Example:
 {
-  "intent":"order"
+  "intent": "general"
 }
             `,
           },
@@ -118,9 +121,9 @@ Return ONLY valid JSON:
     }
 
   } catch (err) {
+
     console.log(
-      "Intent AI Error:",
-      err.message
+      "Intent AI Offline → Using fallback"
     );
 
     return {
@@ -131,18 +134,19 @@ Return ONLY valid JSON:
 
 // -------------------- CHAT API --------------------
 app.post("/api/chat", async (req, res) => {
+
   try {
 
     const { message } = req.body;
 
-    // ---------------- AI INTENT ----------------
+    // ---------------- DETECT INTENT ----------------
     const intentData =
       await detectIntentAI(message);
 
     const intent =
       intentData.intent || "general";
 
-    console.log("AI Intent:", intent);
+    console.log("Intent:", intent);
 
     // ---------------- SYSTEM PROMPTS ----------------
     let systemPrompt = "";
@@ -155,10 +159,8 @@ You are NexaFlow AI Order Support Assistant.
 Responsibilities:
 - Help users track orders
 - Ask for order ID if missing
-- Be professional and conversational
-- Reply in user's language
-
-Keep replies short and helpful.
+- Be professional and helpful
+- Keep replies short
       `;
 
     } else if (intent === "billing") {
@@ -168,24 +170,24 @@ You are NexaFlow AI Billing Assistant.
 
 Responsibilities:
 - Handle invoices
-- Payments
 - Refunds
-- Subscription plans
+- Subscription issues
+- Payments
 
-Be professional and clear.
+Be clear and professional.
       `;
 
     } else if (intent === "technical") {
 
       systemPrompt = `
-You are NexaFlow AI Technical Engineer.
+You are NexaFlow AI Technical Support Engineer.
 
 Responsibilities:
-- Debug software issues
-- Solve API problems
-- Guide step-by-step
+- Solve API issues
+- Debug software
+- Give step-by-step troubleshooting
 
-Use numbered troubleshooting steps.
+Keep replies practical.
       `;
 
     } else {
@@ -195,47 +197,85 @@ You are NexaFlow AI Enterprise Assistant.
 
 You help users with:
 - SaaS
-- Cloud computing
-- CRM systems
-- Enterprise support
+- CRM
+- Cloud platforms
+- Enterprise automation
 
-Be smart, modern, and concise.
+Be modern and concise.
       `;
     }
 
     // ---------------- AI RESPONSE ----------------
-    const response = await axios.post(
-      "http://localhost:11434/api/chat",
-      {
-        model: "llama3.2:1b",
+    let reply = "";
 
-        messages: [
-          {
-            role: "system",
-            content: systemPrompt,
-          },
-          {
-            role: "user",
-            content: message,
-          },
-        ],
+    try {
 
-        stream: false,
+      // LOCAL OLLAMA (WORKS ON YOUR PC)
+      const response = await axios.post(
+        "http://localhost:11434/api/chat",
+        {
+          model: "llama3.2:1b",
+
+          messages: [
+            {
+              role: "system",
+              content: systemPrompt,
+            },
+            {
+              role: "user",
+              content: message,
+            },
+          ],
+
+          stream: false,
+        }
+      );
+
+      reply =
+        response.data?.message?.content ||
+        response.data?.response ||
+        "No AI response";
+
+    } catch (err) {
+
+      console.log(
+        "Ollama Offline → Using Cloud Fallback"
+      );
+
+      // ---------------- CLOUD FALLBACK ----------------
+      if (intent === "order") {
+
+        reply =
+          "I can help track your order. Please provide your order ID or shipment details.";
+
+      } else if (intent === "billing") {
+
+        reply =
+          "I can assist with invoices, subscriptions, and payments. Please share more billing details.";
+
+      } else if (intent === "technical") {
+
+        reply =
+          "I can help troubleshoot your technical issue. Please describe the error or API problem.";
+
+      } else {
+
+        reply =
+          "Welcome to NexaFlow AI Enterprise Assistant. How may I assist you today?";
       }
-    );
+    }
 
-    let reply =
-      response.data?.message?.content ||
-      response.data?.response ||
-      "No response from AI";
-
-    // ---------------- AUTO TICKET SYSTEM ----------------
+    // ---------------- SMART TICKET CREATION ----------------
     let createdTicket = null;
 
-    if (
-      intent === "order" ||
-      intent === "technical"
-    ) {
+    const shouldCreateTicket =
+      intent === "technical" ||
+      message.toLowerCase().includes("problem") ||
+      message.toLowerCase().includes("failed") ||
+      message.toLowerCase().includes("urgent") ||
+      message.toLowerCase().includes("not working");
+
+    if (shouldCreateTicket) {
 
       // 🎫 Generate Ticket ID
       const ticketId =
@@ -244,16 +284,16 @@ Be smart, modern, and concise.
           100000 + Math.random() * 900000
         );
 
-      // 🎫 Save Ticket in MongoDB
+      // 🎫 Save Ticket
       createdTicket =
         await Ticket.create({
-          ticketId: ticketId,
+          ticketId,
           userMessage: message,
-          intent: intent,
+          intent,
           status: "open",
         });
 
-      // 🎫 Append Ticket Info to AI Reply
+      // 🎫 Append Ticket
       reply += `
 
 ━━━━━━━━━━━━━━━━━━
@@ -267,7 +307,7 @@ Status: OPEN
     await Chat.create({
       userMessage: message,
       botReply: reply,
-      intent: intent,
+      intent,
       ticketId:
         createdTicket?.ticketId || null,
     });
@@ -295,6 +335,7 @@ Status: OPEN
 
 // -------------------- HISTORY --------------------
 app.get("/api/history", async (req, res) => {
+
   try {
 
     const chats =
@@ -314,6 +355,7 @@ app.get("/api/history", async (req, res) => {
 
 // -------------------- ANALYTICS --------------------
 app.get("/api/analytics", async (req, res) => {
+
   try {
 
     const totalChats =
@@ -359,6 +401,7 @@ app.get("/api/analytics", async (req, res) => {
 
 // -------------------- GET ALL TICKETS --------------------
 app.get("/api/tickets", async (req, res) => {
+
   try {
 
     const tickets =
@@ -381,6 +424,7 @@ const PORT =
   process.env.PORT || 5000;
 
 app.listen(PORT, () => {
+
   console.log(
     `Server running on port ${PORT}`
   );

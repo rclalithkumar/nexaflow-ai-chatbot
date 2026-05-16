@@ -5,7 +5,7 @@ const Ticket = require("./models/Ticket");
 const mongoose = require("mongoose");
 const express = require("express");
 const cors = require("cors");
-const axios = require("axios");
+const Groq = require("groq-sdk");
 
 require("dotenv").config();
 
@@ -13,6 +13,11 @@ const app = express();
 
 app.use(cors());
 app.use(express.json());
+
+// -------------------- GROQ --------------------
+const groq = new Groq({
+  apiKey: process.env.GROQ_API_KEY,
+});
 
 // -------------------- MONGODB --------------------
 mongoose
@@ -29,7 +34,6 @@ app.get("/", (req, res) => {
 function detectIntent(message) {
   const text = message.toLowerCase();
 
-  // ORDER
   if (
     text.includes("track order") ||
     text.includes("order id") ||
@@ -40,7 +44,6 @@ function detectIntent(message) {
     return "order";
   }
 
-  // BILLING
   if (
     text.includes("invoice") ||
     text.includes("payment") ||
@@ -51,7 +54,6 @@ function detectIntent(message) {
     return "billing";
   }
 
-  // TECHNICAL
   if (
     text.includes("error") ||
     text.includes("bug") ||
@@ -68,10 +70,9 @@ function detectIntent(message) {
 // -------------------- AI INTENT DETECTION --------------------
 async function detectIntentAI(message) {
   try {
-    const response = await axios.post(
-      "http://localhost:11434/api/chat",
-      {
-        model: "llama3.2:1b",
+    const completion =
+      await groq.chat.completions.create({
+        model: "llama-3.1-8b-instant",
 
         messages: [
           {
@@ -84,12 +85,6 @@ Classify ONLY into:
 - billing
 - technical
 - general
-
-Rules:
-- order tracking, shipment, delivery = order
-- invoice, payment, refund = billing
-- error, api, bug = technical
-- normal greetings/questions = general
 
 Return ONLY valid JSON.
 
@@ -104,13 +99,10 @@ Example:
             content: message,
           },
         ],
-
-        stream: false,
-      }
-    );
+      });
 
     const raw =
-      response.data?.message?.content || "";
+      completion.choices[0]?.message?.content || "";
 
     try {
       return JSON.parse(raw);
@@ -123,7 +115,7 @@ Example:
   } catch (err) {
 
     console.log(
-      "Intent AI Offline → Using fallback"
+      "Intent AI Failed → Using fallback"
     );
 
     return {
@@ -206,64 +198,25 @@ Be modern and concise.
     }
 
     // ---------------- AI RESPONSE ----------------
-    let reply = "";
+    const completion =
+      await groq.chat.completions.create({
+        model: "llama-3.1-8b-instant",
 
-    try {
+        messages: [
+          {
+            role: "system",
+            content: systemPrompt,
+          },
+          {
+            role: "user",
+            content: message,
+          },
+        ],
+      });
 
-      // LOCAL OLLAMA (WORKS ON YOUR PC)
-      const response = await axios.post(
-        "http://localhost:11434/api/chat",
-        {
-          model: "llama3.2:1b",
-
-          messages: [
-            {
-              role: "system",
-              content: systemPrompt,
-            },
-            {
-              role: "user",
-              content: message,
-            },
-          ],
-
-          stream: false,
-        }
-      );
-
-      reply =
-        response.data?.message?.content ||
-        response.data?.response ||
-        "No AI response";
-
-    } catch (err) {
-
-      console.log(
-        "Ollama Offline → Using Cloud Fallback"
-      );
-
-      // ---------------- CLOUD FALLBACK ----------------
-      if (intent === "order") {
-
-        reply =
-          "I can help track your order. Please provide your order ID or shipment details.";
-
-      } else if (intent === "billing") {
-
-        reply =
-          "I can assist with invoices, subscriptions, and payments. Please share more billing details.";
-
-      } else if (intent === "technical") {
-
-        reply =
-          "I can help troubleshoot your technical issue. Please describe the error or API problem.";
-
-      } else {
-
-        reply =
-          "Welcome to NexaFlow AI Enterprise Assistant. How may I assist you today?";
-      }
-    }
+    let reply =
+      completion.choices[0]?.message?.content ||
+      "No AI response";
 
     // ---------------- SMART TICKET CREATION ----------------
     let createdTicket = null;
@@ -277,14 +230,12 @@ Be modern and concise.
 
     if (shouldCreateTicket) {
 
-      // 🎫 Generate Ticket ID
       const ticketId =
         "NX-" +
         Math.floor(
           100000 + Math.random() * 900000
         );
 
-      // 🎫 Save Ticket
       createdTicket =
         await Ticket.create({
           ticketId,
@@ -293,7 +244,6 @@ Be modern and concise.
           status: "open",
         });
 
-      // 🎫 Append Ticket
       reply += `
 
 ━━━━━━━━━━━━━━━━━━

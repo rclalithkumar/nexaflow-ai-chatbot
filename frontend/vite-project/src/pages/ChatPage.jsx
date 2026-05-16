@@ -103,25 +103,6 @@ export default function ChatPage() {
       );
 
       let botReply = response.data.reply;
-
-      // 🎫 Optional frontend ticket ID
-      if (
-        currentMessage.toLowerCase().includes("track my order") ||
-        currentMessage.toLowerCase().includes("order not received") ||
-        currentMessage.toLowerCase().includes("payment failed") ||
-        currentMessage.toLowerCase().includes("technical issue") ||
-        currentMessage.toLowerCase().includes("server error") ||
-        currentMessage.toLowerCase().includes("bug")
-      ) {
-        const ticketId =
-          "NX-" + Date.now();
-
-        botReply += `
-
-🎫 Support Ticket Created
-Ticket ID: ${ticketId}`;
-      }
-
       const botMessage = {
         sender: "bot",
         text: botReply,

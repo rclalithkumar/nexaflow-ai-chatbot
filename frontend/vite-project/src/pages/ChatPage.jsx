@@ -13,7 +13,7 @@ export default function ChatPage() {
 
   const chatEndRef = useRef(null);
 
-  // Speech Recognition
+  // 🎤 Speech Recognition
   const {
     transcript,
     resetTranscript,
@@ -32,7 +32,7 @@ export default function ChatPage() {
     });
   }, [messages]);
 
-  //  Put voice text into input
+  // 🎤 Put voice text into input
   useEffect(() => {
     setMessage(transcript);
   }, [transcript]);
@@ -64,7 +64,7 @@ export default function ChatPage() {
     }
   };
 
-  // Start Voice
+  // 🎤 Start Voice
   const startListening = () => {
     resetTranscript();
 
@@ -128,7 +128,7 @@ export default function ChatPage() {
     setLoading(false);
   };
 
-  //  Browser Support
+  // 🎤 Browser Support
   if (!browserSupportsSpeechRecognition) {
     return (
       <div className="text-white p-10">
@@ -299,13 +299,14 @@ export default function ChatPage() {
               className="flex-1 bg-[#111827] border border-cyan-500/20 focus:border-cyan-400 transition px-5 py-4 rounded-2xl outline-none text-white"
             />
 
-            {/*  Voice Button */}
+            {/* 🎤 Voice Button */}
             <motion.button
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
               onClick={startListening}
               className="bg-[#111827] border border-cyan-500/30 px-5 py-4 rounded-2xl text-xl"
             >
+              🎤
             </motion.button>
 
             {/* Send Button */}
@@ -320,7 +321,7 @@ export default function ChatPage() {
 
           </div>
 
-          {/*  Live Voice Text */}
+          {/* 🎤 Live Voice Text */}
           {transcript && (
             <p className="text-cyan-400 mt-3 text-sm">
               Listening: {transcript}

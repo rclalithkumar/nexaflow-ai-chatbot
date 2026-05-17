@@ -13,7 +13,7 @@ export default function ChatPage() {
 
   const chatEndRef = useRef(null);
 
-  // 🎤 Speech Recognition
+  // Speech Recognition
   const {
     transcript,
     resetTranscript,

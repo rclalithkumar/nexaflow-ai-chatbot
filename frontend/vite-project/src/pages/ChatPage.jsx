@@ -304,7 +304,7 @@ export default function ChatPage() {
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
               onClick={startListening}
-              className="bg-[#111827] border border-cyan-500/30 px-5 py-4 rounded-2xl text-xl"
+              className="bg-[#111827] border border-cyan-500/30 px-5 py-4 rounded-2xl text-xl text-cyan-400 hover:bg-cyan-500/10"
             >
               🎤
             </motion.button>
